@@ -113,28 +113,111 @@ public class Bb implements Serializable {
      *
      * @return null pour rester sur la même page.
      */
+
+    /// pour le bonus :
+    // Compte les mots (séparateurs = espaces)
+    private int wordCount(String s) {
+        if (s.isBlank()) return 0;
+        return s.trim().split("\\s+").length;
+    }
+
+    // Compte les mots uniques (insensible à la casse, retire ponctuation simple)
+    private int uniqueCount(String s) {
+        if (s.isBlank()) return 0;
+        java.util.Set<String> set = new java.util.HashSet<>();
+        for (String w : s.toLowerCase(Locale.ROOT).split("\\s+")) {
+            String nw = w.replaceAll("[\\p{Punct}«»“”„]", "");
+            if (!nw.isBlank()) set.add(nw);
+        }
+        return set.size();
+    }
+
+    // Renvoie vrai si s est un palindrome en ignorant espaces/accents/ponctuation
+    private boolean isPalindrome(String s) {
+        if (s.isBlank()) return false;
+        String normalized = stripAccents(s)
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]", "");
+        if (normalized.isEmpty()) return false;
+        int i = 0, j = normalized.length() - 1;
+        while (i < j) {
+            if (normalized.charAt(i) != normalized.charAt(j)) return false;
+            i++; j--;
+        }
+        return true;
+    }
+
+    // Renverse tout le texte (miroir)
+    private String mirror(String s) {
+        return new StringBuilder(s).reverse().toString();
+    }
+
+    // Acronyme = initiales de chaque mot (lettres uniquement)
+    private String acronym(String s) {
+        if (s.isBlank()) return "";
+        StringBuilder ac = new StringBuilder();
+        for (String w : s.trim().split("\\s+")) {
+            for (int i = 0; i < w.length(); i++) {
+                char c = w.charAt(i);
+                if (Character.isLetter(c)) {
+                    ac.append(Character.toUpperCase(c));
+                    break;
+                }
+            }
+        }
+        return ac.toString();
+    }
+
+    // Suppression d’accents sans dépendance externe
+    private String stripAccents(String s) {
+        String norm = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD);
+        return norm.replaceAll("\\p{M}", "");
+    }
+
     public String envoyer() {
-        if (question == null || question.isBlank()) {
-            // Erreur ! Le formulaire va être réaffiché en réponse à la requête POST, avec un message d'erreur.
-            FacesMessage message = new FacesMessage(FacesMessage.SEVERITY_ERROR,
-                    "Texte question vide", "Il manque le texte de la question");
-            facesContext.addMessage(null, message);
+        if (this.question == null || this.question.isBlank()) {
+            FacesMessage message = new FacesMessage(
+                    FacesMessage.SEVERITY_ERROR,
+                    "Texte question vide",
+                    "Il manque le texte de la question"
+            );
+            this.facesContext.addMessage(null, message);
             return null;
         }
-        // Entourer la réponse avec "||".
-        this.reponse = "||";
-        // Si la conversation n'a pas encore commencé, ajouter le rôle système au début de la réponse
+
+        StringBuilder rep = new StringBuilder();
+
+        // Afficher le rôle actif une seule fois puis le verrouiller
         if (this.conversation.isEmpty()) {
-            // Ajouter le rôle système au début de la réponse
-            this.reponse += roleSysteme.toUpperCase(Locale.FRENCH) + "\n";
-            // Invalide le bouton pour changer le rôle système
+            rep.append("Rôle actif:\n")
+                    .append((this.roleSysteme == null ? "N/A" : this.roleSysteme))
+                    .append("\n");
             this.roleSystemeChangeable = false;
         }
-        this.reponse += question.toLowerCase(Locale.FRENCH) + "||";
-        // La conversation contient l'historique des questions-réponses depuis le début.
-        afficherConversation();
+
+        // Nettoyage basique (espaces multiples -> simple espace)
+        String clean = question.trim().replaceAll("\\s+", " ");
+
+        // Calculs
+        int totalMots = wordCount(clean);
+        int uniques = uniqueCount(clean);
+        boolean pal = isPalindrome(clean);
+        String miroir = mirror(clean);
+        String acro = acronym(clean);
+
+        // Construction de la réponse "diagnostic"
+        rep.append("Analyse du message:\n")
+                .append("- Mots: ").append(totalMots)
+                .append(" | Uniques: ").append(uniques).append("\n")
+                .append("- Palindrome: ").append(pal ? "oui" : "non").append("\n")
+                .append("- Acronyme: ").append(acro).append("\n")
+                .append("- Miroir: ").append(miroir);
+
+        this.reponse = rep.toString();
+        this.afficherConversation();
         return null;
     }
+
 
     /**
      * Pour un nouveau chat.
